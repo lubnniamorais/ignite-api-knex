@@ -3,9 +3,9 @@ import { knex } from './database'
 import { env } from './env'
 
 app.get('/hello', async () => {
-  const tables = await knex('sqlite_schema').select('*')
+  const transaction = await knex('transactions').where('amount', 1000).select('*')
 
-  return tables
+  return transaction
 })
 
 app.listen(
