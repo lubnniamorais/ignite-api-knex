@@ -1,6 +1,6 @@
 # App
 
-GymPass style app.
+API with Knex.
 
 # RFs (Requisitos Funcionais)
 
