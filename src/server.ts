@@ -2,7 +2,9 @@ import { app } from './app'
 import { env } from './env'
 import { transactionsRoutes } from './routes/transactions'
 
-app.register(transactionsRoutes)
+app.register(transactionsRoutes, {
+  prefix: 'transactions'
+})
 
 app.listen(
   {
