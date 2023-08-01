@@ -1,10 +1,14 @@
-import { app } from './app'
-import { env } from './env'
-import { transactionsRoutes } from './routes/transactions'
+import { app } from './app';
+import { env } from './env';
+
+import cookie from '@fastify/cookie';
+import { transactionsRoutes } from './routes/transactions';
+
+app.register(cookie);
 
 app.register(transactionsRoutes, {
-  prefix: 'transactions'
-})
+  prefix: 'transactions',
+});
 
 app.listen(
   {
@@ -12,6 +16,6 @@ app.listen(
     port: env.PORT,
   },
   () => {
-    console.log('🚀 Server is listening')
+    console.log('🚀 Server is listening');
   },
-)
+);
