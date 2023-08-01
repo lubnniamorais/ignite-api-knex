@@ -5,6 +5,11 @@ import { z } from 'zod';
 import { checkSessionIdExists } from '@/middlewares/check-session-id-exists';
 
 export async function transactionsRoutes(app: FastifyInstance) {
+  // Hook global
+  // app.addHook('preHandler', async (request, reply) => {
+  //   console.log(`[${request.method}]-${request.url}`);
+  // });
+
   app.post('/', async (request, reply) => {
     const createTransactionBodySchema = z.object({
       title: z.string(),
