@@ -24,12 +24,131 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 
 // src/app.ts
 var import_fastify = __toESM(require("fastify"));
+var import_cookie = __toESM(require("@fastify/cookie"));
+
+// src/env/index.ts
+var import_dotenv = require("dotenv");
+var import_zod = require("zod");
+if (process.env.NODE_ENV === "test") {
+  (0, import_dotenv.config)({ path: ".env.test" });
+} else {
+  (0, import_dotenv.config)();
+}
+var envSchema = import_zod.z.object({
+  NODE_ENV: import_zod.z.enum(["dev", "test", "production"]).default("dev"),
+  PORT: import_zod.z.coerce.number().default(3333),
+  DATABASE_URL: import_zod.z.string()
+});
+var _env = envSchema.safeParse(process.env);
+if (_env.success === false) {
+  console.error("\u274C Invalid environment variables", _env.error.format());
+  throw new Error("Invalid environment variables");
+}
+var env = _env.data;
+
+// src/database.ts
+var import_knex = require("knex");
+var config2 = {
+  client: "sqlite",
+  connection: {
+    filename: env.DATABASE_URL
+  },
+  useNullAsDefault: true,
+  migrations: {
+    extension: "ts",
+    directory: "./db/migrations"
+  }
+};
+var knex = (0, import_knex.knex)(config2);
+
+// src/routes/transactions.ts
+var import_crypto = require("crypto");
+var import_zod2 = require("zod");
+
+// src/middlewares/check-session-id-exists.ts
+async function checkSessionIdExists(request, reply) {
+  const sessionId = request.cookies.sessionId;
+  if (!sessionId) {
+    return reply.status(401).send({
+      error: "Unauthorized"
+    });
+  }
+}
+
+// src/routes/transactions.ts
+async function transactionsRoutes(app2) {
+  app2.post("/", async (request, reply) => {
+    const createTransactionBodySchema = import_zod2.z.object({
+      title: import_zod2.z.string(),
+      amount: import_zod2.z.number(),
+      type: import_zod2.z.enum(["credit", "debit"])
+    });
+    const { title, amount, type } = createTransactionBodySchema.parse(
+      request.body
+    );
+    let sessionId = request.cookies.sessionId;
+    if (!sessionId) {
+      sessionId = (0, import_crypto.randomUUID)();
+      reply.cookie("sessionId", sessionId, {
+        path: "/",
+        maxAge: 1e3 * 60 * 60 * 24 * 7
+        // 7 days
+      });
+    }
+    await knex("transactions").insert({
+      id: (0, import_crypto.randomUUID)(),
+      title,
+      amount: type === "credit" ? amount : amount * -1,
+      session_id: sessionId
+    });
+    return reply.status(201).send();
+  });
+  app2.get(
+    "/",
+    { preHandler: [checkSessionIdExists] },
+    async (request, reply) => {
+      const { sessionId } = request.cookies;
+      const transactions = await knex("transactions").where("session_id", sessionId).select();
+      return { transactions };
+    }
+  );
+  app2.get("/:id", { preHandler: [checkSessionIdExists] }, async (request) => {
+    const getTransactionParamsSchema = import_zod2.z.object({
+      id: import_zod2.z.string().uuid()
+    });
+    const { id } = getTransactionParamsSchema.parse(request.params);
+    const { sessionId } = request.cookies;
+    const transaction = await knex("transactions").where({
+      session_id: sessionId,
+      id
+    }).first();
+    return { transaction };
+  });
+  app2.get(
+    "/summary",
+    { preHandler: [checkSessionIdExists] },
+    async (request) => {
+      const { sessionId } = request.cookies;
+      const summary = await knex("transactions").where("session_id", sessionId).sum("amount", { as: "amount" }).first();
+      return { summary };
+    }
+  );
+}
+
+// src/app.ts
 var app = (0, import_fastify.default)();
+app.register(import_cookie.default);
+app.register(transactionsRoutes, {
+  prefix: "transactions"
+});
 
 // src/server.ts
-app.listen({
-  host: "0.0.0.0",
-  port: 3333
-}, () => {
-  console.log("\u{1F680} Server is listening");
-});
+app.listen(
+  {
+    host: "0.0.0.0",
+    port: env.PORT
+  },
+  () => {
+    console.log("\u{1F680} Server is listening");
+  }
+);
